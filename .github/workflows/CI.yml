@@ -49,7 +49,9 @@ jobs:
           while IFS= read -r file; do
             [[ -n "$file" ]] || continue
             echo "Running $file"
-            if [[ "$file" == tests/test_*.py || "$file" == tests/*_test.py ]]; then
+            if [[ "$file" == model_training/*.py ]]; then
+              python -m pytest tests/test_training_experiments.py -v
+            elif [[ "$file" == tests/test_*.py || "$file" == tests/*_test.py ]]; then
               python -m pytest "$file" -v
             else
               python "$file"

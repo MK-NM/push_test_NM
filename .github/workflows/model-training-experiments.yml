@@ -4,9 +4,11 @@ on:
   push:
     paths:
       - "model_training/**"
+      - "requirements.txt"
+      - ".github/workflows/model-training-experiments.yml"
 
 jobs:
-  run-experiments:
+  train:
     runs-on: ubuntu-24.04
 
     steps:
@@ -21,5 +23,54 @@ jobs:
       - name: Install dependencies
         run: python -m pip install -r requirements.txt
 
-      - name: Run training experiments
+      - name: Run training and create artifacts
         run: python -m model_training.train_experiments
+
+      - name: Upload feature and validation artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: training-diagnostics
+          path: |
+            artifacts/feature_schema.json
+            artifacts/validation_report.json
+            artifacts/validation_predictions.csv
+          retention-days: 14
+          if-no-files-found: error
+
+      - name: Upload candidate model for validation
+        uses: actions/upload-artifact@v4
+        with:
+          name: training-candidate
+          path: artifacts/best_model.joblib
+          retention-days: 1
+          if-no-files-found: error
+
+  validate-and-publish:
+    needs: train
+    runs-on: ubuntu-24.04
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v5
+
+      - name: Download feature and validation artifacts
+        uses: actions/download-artifact@v4
+        with:
+          name: training-diagnostics
+          path: artifacts
+
+      - name: Download candidate model
+        uses: actions/download-artifact@v4
+        with:
+          name: training-candidate
+          path: artifacts
+
+      - name: Validate artifacts and quality gate
+        run: python -m model_training.validate_artifacts
+
+      - name: Publish validated model artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: best-regression-model
+          path: artifacts/best_model.joblib
+          if-no-files-found: error
